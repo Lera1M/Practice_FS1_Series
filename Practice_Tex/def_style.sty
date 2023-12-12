@@ -1,0 +1,77 @@
+% Basic styling for a typical article/paper/coursework draft.
+% (c) Alekseev M.M.
+
+\NeedsTeXFormat{LaTeX2e}[1994/06/01]
+\ProvidesPackage{def_style}
+  [2023/09/02 v1.0 Basic LaTeX package for personal use]
+% --> Default packages:
+\RequirePackage{amsmath, amssymb, amsthm, etoolbox}
+\RequirePackage{graphics, tikz, tkz-fct}
+\RequirePackage{pbox, float, cases}
+\RequirePackage{mathtools}
+%\RequirePackage{hyperref}
+\RequirePackage{geometry}
+\geometry{
+	a4paper,
+	total={170mm,257mm},
+	left=20mm,
+	top=20mm
+}
+\pagenumbering{arabic}
+
+% --> Feature packages:
+\RequirePackage{setspace}
+\RequirePackage[labelsep=period]{caption}
+\RequirePackage{subcaption}
+\RequirePackage{titlesec}
+\RequirePackage{gensymb}
+\RequirePackage{physics, xfrac, cancel}
+\RequirePackage{mathrsfs}
+\RequirePackage{pdfpages} % To input .ppt slide for reports.
+\RequirePackage{enumitem}
+\RequirePackage{scalerel}
+
+% -> TOC styling:
+\RequirePackage{tocloft}
+\renewcommand\cftsecfont{\mdseries}
+\renewcommand\cftsecpagefont{\mdseries}
+\newcommand{\fakesection}[1]{
+  \par\refstepcounter{subsection}
+  \subsectionmark{#1}
+  \addcontentsline{toc}{section}{\protect\numberline{\thesection}#1}
+}
+
+% -> Code Listing styling:
+%\RequirePackage{listings}
+\RequirePackage{xcolor}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+%\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+%\lstdefinestyle{mystyle}{
+%    numberstyle=\color{codegray},
+%    commentstyle=\color{codegreen},
+%    numbers=left,                    
+%    numbersep=15pt,
+%    breakatwhitespace=true,
+%    breaklines=true, 
+%    basicstyle=\ttfamily\normalsize
+%}
+%\lstset{style=mystyle}
+
+% -> Matrix styling:
+\usepackage{empheq}
+\newcommand*\widefbox[1]{\fbox{\hspace{2em}#1\hspace{2em}}}
+\renewenvironment{pmatrix}
+  {\left(\mkern3.5mu\env@matrix}
+  {\endmatrix\mkern3.5mu\right)}
+\renewenvironment{vmatrix}
+  {\left|\mkern3.5mu\env@matrix}
+  {\endmatrix\mkern3.5mu\right|}
+  
+% -> New commands & definitions:
+\def\doubleunderline#1{\underline{\underline{#1}}}
+\DeclareMathOperator{\di}{d\!}
+\newcommand{\Implies}{\quad\implies\quad}
+%\newcommand{\RN}[1]{\textup{\uppercase\expandafter{\romannumeral#1}}}
+\newcommand{\altBinom}[2]{\begin{pmatrix} #1 \\[3pt] #2 \end{pmatrix}}
+
+\endinput

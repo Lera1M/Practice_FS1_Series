@@ -1,0 +1,323 @@
+\documentclass{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{def_style}
+\usepackage[hyper]{amsbib}
+\usepackage{wrapfig}
+\usepackage{multicol}
+\usepackage{blindtext}
+\usepackage{multirow}
+\usepackage{cellspace, longtable}
+\setlength\cellspacetoplimit{3pt}
+\setlength\cellspacebottomlimit{3pt}
+\usepackage{booktabs}
+% Verbatim words:
+\usepackage{fancyvrb}
+\DeclareMathSymbol{\shortminus}{\mathbin}{AMSa}{"39}
+\usepackage{listings}
+\lstdefinestyle{mystyle}{
+    keywordstyle=\color{blue},              
+    basicstyle=\ttfamily\normalsize,
+    columns=fullflexible,
+    keepspaces=true,
+    commentstyle=\color{codegreen}
+}
+\lstdefinestyle{inline_style}{
+	language={[LaTeX]TeX},
+    basicstyle=\ttfamily\Large\bfseries
+}
+\lstset{style=mystyle}
+% Title settings:
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{1em}{}
+% Numbering settings:
+%\renewcommand{\theequation}{\thesection.\arabic{equation}}
+%\counterwithin*{equation}{section}
+% Theorem settings:
+\theoremstyle{definition}
+\newtheorem*{definition}{Определение}
+\newtheorem*{statement}{Утверждение}
+\newtheorem{task}{Задание}
+% Specific commands:
+\newcommand{\ExternalLink}{%
+\tikz[x=1.2ex, y=1.2ex, baseline=-0.05ex]{% 
+    \begin{scope}[x=1ex, y=1ex]
+        \clip (-0.1,-0.1) 
+            --++ (-0, 1.2) 
+            --++ (0.6, 0) 
+            --++ (0, -0.6) 
+            --++ (0.6, 0) 
+            --++ (0, -1);
+        \path[draw, 
+            line width = 0.5, 
+            rounded corners=0.5] 
+            (0,0) rectangle (1,1);
+    \end{scope}
+    \path[draw, line width = 0.5] (0.5, 0.5) 
+        -- (1, 1);
+    \path[draw, line width = 0.5] (0.6, 1) 
+        -- (1, 1) -- (1, 0.6);
+    }
+}
+
+\title{\textbf{Численная аппроксимация рядов}}
+\author{Или как сойти с \textbf{небес} сквозь \texttt{double} в \textbf{ад}.}
+\date{\today}
+\begin{document}
+\maketitle
+Суммирование рядов неоспоримо является одной из наиболее естественных и классических задач математического анализа. От разрешения рекуррентных соотношений до простых чисел и задач тысячелетия - многие вопросы в математике требуют непосредственного взаимодействия с рядами. Тем не менее изучение рядов всегда имело два крайне разных аспекта: 
+\begin{itemize}
+\item[---] \textit{теоретический}, основанный на фундаментальных вопросах определения областей сходимости, нахождения аналитических решений, формирования оценок;
+\item[---] \textit{практический}, посвящённый непосредственному эффективному численному вычислению сумм самых разнообразных числовых последовательностей.
+\end{itemize}
+\section{Теоретическая оценка рядов}
+Несмотря на то, что данная практическая работа будет в основном ориентирована на вычислительную сторону числовых рядов, мы не сможем далее обойтись без некоторых фундаментальных результатов классического анализа (см., например, \cite{Zorich}).
+\begin{definition}
+Выражение $a_1 + a_2 + ... + a_n + ...$ обозначается $\sum_{n=1}^\infty a_n$ и обычно называют \textit{рядом} или \textit{бесконечным рядом}. Элементы последовательности $\{a_n\}$ называют \textit{членами ряда}.
+\end{definition}
+\begin{definition}
+Суммы $S_n = \sum_{k=1}^n a_k$ называют \textit{частичными суммами ряда}. Если последовательность $\{S_n\}$ сходится, то ряд называется \textit{сходящимся} и $\lim_{n\rightarrow\infty}S_n = S$ называется \textit{суммой ряда}. Если последовательность $\{S_n\}$ не имеет предела, то ряд называется \textit{расходящимся}. 
+\end{definition}
+\begin{definition}
+Ряд $R_n = \sum_{k=n+1}^\infty a_k$, полученный отбрасыванием от исходного $n$ первых членов, называется \textit{остатком ряда}. При этом имеет место следующая простейшая оценка суммы ряда:
+\begin{equation*}
+S = S_n + R_n \quad\implies\quad |S - S_n| = |R_n|. 
+\end{equation*} 
+\end{definition}
+\begin{statement}[Признак Лейбница]
+Пусть дан знакочередующийся ряд $S=\sum_{k=1}^\infty (-1)^k b_k \,:\, b_k \geq 0$. Тогда остаток сходящегося знакочередующегося ряда будет по модулю меньше первого отброшенного слагаемого: $|R_n| < b_{n+1}$.
+\end{statement} \noindent
+Таким образом, при суммировании знакочередующихся рядов с некоторой заранее заданной точностью $\varepsilon$ признак Лейбница зачастую используется как  \textbf{критерий остановки}.
+\lstset{style=inline_style}
+\section{\lstinline|Double|: Арифметика чисел с плавающей запятой}
+\lstset{style=mystyle}
+\textbf{Числа с плавающей запятой} (\verb_Floating-point numbers_, \cite{Float}) есть экспоненциальная форма представления вещественных чисел в виде мантиссы и порядка. Наиболее часто используется стандарт \verb_IEEE 754_, согласно которому двойная точность (\verb_Double_) занимает 64 бита и использует 52-битную на мантиссу.\\[-10pt]
+\begin{wrapfigure}{l}{0.3\textwidth} \vspace{-12pt}
+\begin{equation*}
+\begin{array}{l l l}
+& \mathtt{3.14159} & \mathtt{e4} \\
+\mathtt{+} & \mathtt{2.41421} & \mathtt{e\!\shortminus\!\!1} \\ \hline \\[-8pt]
+& \mathtt{3.14159} & \mathtt{e4} \\
+\mathtt{+} & \mathtt{0.0000241421} & \mathtt{e4} \\ \hline  \\[-8pt]
+\mathtt{=} & \mathtt{3.1416141421} & \mathtt{e4} \\ \hline \\[-8pt]
+\mathtt{=} & \mathtt{3.14161} & \mathtt{e4}
+\end{array}
+\end{equation*}
+\end{wrapfigure} \indent
+Численный расчёт рядов требует суммирования большого количества чисел с плавающей запятой, поэтому рассмотрим на простом примере некоторые особенности операции сложения таких представлений. Будем использовать упрощённую модель -- десятичную систему чисел с плавающей запятой, использующую 6-значные мантиссы. В рамках этой модели попробуем сложить пару чисел: \verb_31415.9 + 0.241421 = 3.14159e4 + 2.41421e-1_. Для этого приведём оба числа к одному порядку (\verb_e4_), произведём суммирование и округлим результат до 6-значной мантиссы. Нельзя не заметить, что при таком построении процесса суммирования чисел с плавающей запятой последние 5 цифр (\verb_41421_) второго слагаемого бесследно исчезают.  Этот курьёзный феномен называется \textbf{ошибкой округления} (\verb_round-off error_) и, как мы увидим далее, может иметь крайне деструктивный эффект. \newpage\noindent
+Рассмотрим сумму трёх слагаемых: \verb_31415.9 + 0.241421 + 0.0433013 = 31416.1 + 0.0433013_. 
+\begin{wrapfigure}{r}{0.3\textwidth} \vspace{-10pt}
+\begin{equation*}
+\begin{array}{l l l}
+& \mathtt{3.14161} & \mathtt{e4} \\
+\mathtt{+} & \mathtt{4.33013} & \mathtt{e\!\shortminus\!\!2} \\ \hline \\[-8pt]
+& \mathtt{3.14161} & \mathtt{e4} \\
+\mathtt{+} & \mathtt{0.00000433013} & \mathtt{e4} \\ \hline  \\[-8pt]
+\mathtt{=} & \mathtt{3.14161} & \mathtt{e4}
+\end{array}
+\end{equation*}
+\vspace{-10pt}
+\end{wrapfigure}
+Повторяя уже описанный процесс, нетрудно заметить, что эта сумма будет равна \verb_31416.1_. С другой стороны, можно произвести суммирование в ином порядке и получить \verb_31415.9 + (0.241421 + 0.0433013) =_ \verb_= 31415.9 + 0.284722 = 31416.2_. Таким образом, мы на простейшем контрпримере проиллюстрировали \textbf{отсутствие ассоциативности операции сложения} чисел с плавающей запятой.\\
+Простейшим способом борьбы с такими ошибками округления является превентивная \textit{сортировка} последовательности и последующее суммирование чисел в порядке их возрастания. В общем случае этот метод не гарантирует повышения точности, но считается хорошей практикой. Более интересным решением является \textbf{алгоритм суммирования Кэхена} (Kahan summation, \cite{Kahan}), использующий принцип \textit{компенсационного суммирования}.\vspace{-7pt}
+\begin{multicols}{2}
+\begin{minipage}{0.48\textwidth}
+\begin{lstlisting}[language=C++]
+double KahanSum(input) {
+    double s = 0.0; //sum
+    double c = 0.0; //compensation
+    for (i=0; i< N; i++){
+        double y = input[i] - c
+        volatile double t = sum + y;
+        volatile double z = t - sum;
+        c = z - y;
+        s = t;
+    }
+    return s;
+}
+\end{lstlisting}
+\end{minipage} \vfill\null\columnbreak\noindent
+Рассмотрим работу этого алгоритма на примере суммы \verb_31415.9 + 0.241421 + 0.0433013_. В таблицах ниже приводятся все промежуточные значения.
+\begin{equation*}
+\begin{array}{l}
+\mathtt{Iteration\; 1.} \\ \hline \\[-8pt]
+\begin{array}{l l l}
+\mathtt{s} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-} 3.14159} & \!\!\!\mathtt{e4} \\
+\mathtt{c} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}0.00000} & \!\!\!\mathtt{e0} \\ \hline \\[-8pt]
+\mathtt{y} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}2.41421} & \!\!\!\mathtt{e\!\shortminus\!\!1} \\
+\mathtt{t} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}3.14161} & \!\!\!\mathtt{e4} \\
+\mathtt{z} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}2.00000} & \!\!\!\mathtt{e\!\shortminus\!\!1} \\ \hline\\[-8pt]
+\mathtt{c} \!\!\!\!\!\!\!& \mathtt{=\, -4.14210} & \!\!\!\mathtt{e\!\shortminus\!\!2}
+\end{array} \\[8pt] \hline
+\end{array} \qquad 
+\begin{array}{l}
+\mathtt{Iteration\; 2.} \\ \hline \\[-8pt]
+\begin{array}{l l l}
+\mathtt{s} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}3.14161} & \!\!\!\mathtt{e4} \\
+\mathtt{c} \!\!\!\!\!\!\!& \mathtt{=\, -4.14210} & \!\!\!\mathtt{e\!\shortminus\!\!2} \\ \hline \\[-8pt]
+\mathtt{y} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}7.14733} & \!\!\!\mathtt{e\!\shortminus\!\!2} \\
+\mathtt{t} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}3.14162} & \!\!\!\mathtt{e4} \\
+\mathtt{z} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}1.00000} & \!\!\!\mathtt{e\!\shortminus\!\!1} \\ \hline\\[-8pt]
+\mathtt{c} \!\!\!\!\!\!\!& \mathtt{=\, \phantom{-}2.85267} & \!\!\!\mathtt{e\!\shortminus\!\!2}
+\end{array} \\[8pt] \hline
+\end{array}
+\end{equation*}
+\end{multicols} \vspace{-0.5cm}\noindent
+В процессе суммирования Кэхена ``потерянные'' цифры высчитываются и сохраняются в компенсирующем слагаемом \verb_c_, после чего они вычитаются из последующего слагаемого. Так, в нашем примере после первой итерации (\verb_31415.9 + 0.241421_) переменная \verb_c = -4.14210e-2_ \, и хранит в себе незначительную часть второго слагаемого \verb_0.241421_. Стоит заметить, что, хотя такой метод суммирования и лучше ``наивного'' суммирования, он всё равно может приводить к довольно значительным вычислительным неточностям.
+Так, большинство модификаций алгоритма суммирования Кэхена оказываются малоэффективны при \textbf{расчёте разницы двух почти равных чисел} (\verb_Catastrophic cancellation_). Проблематичность этого феномена заключается в том, что при вычитании двух близких чисел (например \verb_3.14159e4 - 3.141597e4 = 2.00000e-1_) значимыми цифрами в мантиссе становятся те цифры изначальных слагаемых, которые до этого не являлись значимыми и не участвовали в расчётах.
+\section{Практические сложности при расчёте рядов}
+\begin{wrapfigure}{l}{0.5\textwidth} \vspace{-0.5cm}
+\centering
+\includegraphics[width=0.5\textwidth]{sine.png}
+\caption{Коэффициенты $a_n(x_0)$ ряда Маклорена \eqref{eq:sine}}
+\label{fig:sine}
+\end{wrapfigure}
+Высокоточная и эффективная аппроксимация конечных сумм является довольно специфичной областью математической и компьютерной науки (см. \cite{online}). Существует множество различных алгоритмов и предложений, нацеленных как на ускорение сходимости рядов (см., например, метод Эйлера-Абеля, $\varepsilon$-алгоритм Винна и другие), так и на увеличение точности расчётов. В данной практической работе мы постарались ознакомить читателя с базовыми методами уменьшения вычислительных погрешностей, характерных для численного суммирования.
+\textit{Ошибки округления} могут приводить к понижению точности расчётов многих рядов, особенно в случае их знакопостоянства. Особенно легко с этим столкнуться, вычисляя значения функций в точках $x\,:\,|x|\gg 0$, посредством их ряда Маклорена.
+Тем не менее \verb_catastrophic cancellation_ зачастую имеет более деструктивное влияние на точность расчётов. 
+\begin{equation} \label{eq:sine}
+\sin(x) = \sum_{n=0}^\infty a_n(x) = \sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n+1}}{(2n+1)!}.
+\end{equation}
+\newpage\noindent
+Рассмотрим простейший пример - вычисление (по формуле \ref{eq:sine}) с точностью $\varepsilon=10^{-12}$ значения функции $\sin(x)$ в точке $x_0=13\pi/2$. Из признака Лейбница можно определить, что для достижения заданной точности нам потребуется 38 слагаемых. Тем не менее при непосредственном ``наивном'' вычислении такой аппроксимации точного значения $\sin(13\pi/2) = 1$ мы получаем значение \verb_s = 1.00000000485172_. Иными словами, \textit{на практике точность аппроксимации оказалась на несколько порядков меньше ожидаемой теоретической}: $\delta \approx 4.85\cdot 10^{-9} > \varepsilon$. Это поясняется накапливанием вычислительных погрешностей, порождённых необходимостью складывать числа схожие по порядку, но отличающиеся по знаку (см. рис.~\ref{fig:sine}).
+\begin{equation*}
+\erf(x) \;=\; \dfrac{2}{\sqrt{\pi}}\int_0^{\,x} e^{-t^2}dt \;=\; \dfrac{2}{\sqrt{\pi}}\sum_{n=0}^\infty \dfrac{(-1)^n\,x^{2n+1}}{n!\,(2n+1)}.
+\end{equation*}\par
+Конечно, в реальной практике трудности, описанные в прошлом примере, разрешаются банально просто -- используется периодичность синуса и расчёты производятся для точек отрезка $[-\pi;\pi]$. Но что делать в более специфичных случаях? Например, как рассчитать с высокой точностью значение \textit{функции ошибок} $\erf(x)$, имеющей огромную значимость в теории вероятности и математической статистике? Периодичность здесь уже не применить, а вот проблемы возникают примерного того же типа, что и при вычислении $\sin(x)$... В действительности решение вопросов такого рода зачастую требует изучения и применения новых представлений, аппроксимаций решений соответствующих ОДУ и использования асимптотических аппроксимаций, а это уже не входит в рамки предлагаемой практической работы.
+\section{Условия вариантов и рекомендации}
+\begin{task}
+\textit{Суммирование знакочередующихся числовых последовательностей:} \\
+Цель данной задачи состоит в ознакомлении с описанными выше методами на примере суммирования знакочередующегося функционального ряда при двух разных значениях переменного $x$. Требуется:
+\begin{enumerate}
+\item Определить количество слагаемых $n$, необходимое для достижения теоретической оценки $\varepsilon=10^{-12}$ максимального отклонения конечной суммы от точного значения ряда;
+\item Аппроксимировать значение ряда $\Sigma_i$, используя: ``наивное'' суммирование; суммирование в порядке возрастания слагаемых; алгоритм суммирования по Кэхену. В каждом случае рассчитать отклонение $\delta_i$ от известного точного значения $S$.
+\end{enumerate}
+Отразить в отчёте полученные значения $n,\, \Sigma_i,\, \delta_i$ (точность записи: 15 значимых цифр) и сделать выводы о точности аппроксимаций. Дополнительно предоставить файл с исходным кодом. Для повышения точности расчётов рекомендуется производить \textbf{рекуррентный пересчёт коэффициентов ряда}, а не прямые вычисления, основанные на явных формулах (см., например, прикреплённые файлы). \\[4pt]
+\textit{Рекомендация:} На практике оказывается куда удобнее и разумнее рассчитывать коэффициенты рядов Тейлора рекуррентным образом. Это уменьшает количество операций и в некоторых случаях позволяет увеличить точность расчётов.
+\end{task}
+\begin{longtable}[c]{|c||Sc||c|c||c|c|}
+\hline
+\textnumero & Знакочередующийся ряд & \multicolumn{2}{c||}{Точка 1} & \multicolumn{2}{c|}{Точка 2} \\ \hline \endhead
+1 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n}}{(2n+1)!}\end{aligned}$ & $x = \dfrac{\pi}{2}$ & $S = \dfrac{2}{\pi}$ & $x = \dfrac{15\pi}{2}$ & $S = \dfrac{-2}{15\pi}$ \\ \hline
+2 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n-1}}{(2n)!}\end{aligned}$ & $x = \pi$ & $S = \dfrac{-1}{\pi}$ & $x = 9\pi$ & $S = \dfrac{-1}{9\pi}$ \\ \hline
+3 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{n-1}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = 11$ & $S = \dfrac{1}{11e^{11}}$ \\ \hline
+4 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-2(n+1)}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 100$ & $S = \frac{1}{100}\,\mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{9}{8}$ & $S = \frac{8}{9}\,\mathrm{arsh}\left(\frac{8}{9}\right)$ \\ \hline
+5 & $\begin{aligned}\dfrac{\ln(2x)}{x} - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{2n+1}}\end{aligned}$ & $x = 100$ & $S = \frac{1}{100}\,\mathrm{arsh}(100)$ & $x = \dfrac{9}{8}$ & $S = \frac{8}{9}\,\mathrm{arsh}\left(\frac{9}{8}\right)$ \\ \hline
+6 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n+1}}{(2n+1)!}\end{aligned}$ & $x = \sqrt{\dfrac{\pi}{2}}$ & $S = \sqrt{\dfrac{2}{\pi}}$ & $x = \sqrt{\dfrac{15\pi}{2}}$ & $S = -\sqrt{\dfrac{2}{15\pi}}$ \\ \hline
+7 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n-1}}{(2n)!}\end{aligned}$ & $x = \sqrt{\pi}$ & $S = \dfrac{-1}{\sqrt{\pi}}$ & $x = 3\sqrt{\pi}$ & $S = \dfrac{-1}{3\sqrt{\pi}}$ \\ \hline
+8 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n-1}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = \sqrt{11}$ & $S = \dfrac{1}{\sqrt{11}\,e^{11}}$ \\ \hline
+9 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-4n-3}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 10$ & $S = \frac{1}{10}\,\mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{3}{2\sqrt{2}}$ & $S = \frac{2\sqrt{2}}{3}\,\mathrm{arsh}\left(\frac{8}{9}\right)$ \\ \hline
+10 & $\begin{aligned}\dfrac{\ln(2x^2)}{x} - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{4n+1}}\end{aligned}$ & $x = 10$ & $S = \frac{1}{10}\,\mathrm{arsh}(100)$ & $x = \dfrac{3}{2\sqrt{2}}$ & $S = \frac{2\sqrt{2}}{3}\,\mathrm{arsh}\left(\frac{9}{8}\right)$ \\ \hline
+11 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n+1}}{(2n+1)!}\end{aligned}$ & $x = \dfrac{\pi}{2}$ & $S = 1$ & $x = \dfrac{13\pi}{2}$ & $S = 1$ \\ \hline
+12 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n}}{(2n)!}\end{aligned}$ & $x = \pi$ & $S = -1$ & $x = 7\pi$ & $S = -1$ \\ \hline
+13 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{n}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = 10$ & $S = \dfrac{1}{e^{10}}$ \\ \hline
+14 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-2n-1}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 100$ & $S = \mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{8}{7}$ & $S = \mathrm{arsh}\left(\frac{7}{8}\right)$ \\ \hline
+15 & $\begin{aligned}\ln(2x) - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{2n}}\end{aligned}$ & $x = 100$ & $S = \mathrm{arsh}(100)$ & $x = \dfrac{8}{7}$ & $S = \mathrm{arsh}\left(\frac{8}{7}\right)$ \\ \hline
+16 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n+2}}{(2n+1)!}\end{aligned}$ & $x = \sqrt{\dfrac{\pi}{2}}$ & $S = 1$ & $x = \sqrt{\dfrac{13\pi}{2}}$ & $S = 1$ \\ \hline
+17 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n}}{(2n)!}\end{aligned}$ & $x = \sqrt{\pi}$ & $S = -1$ & $x = \sqrt{7\pi}$ & $S = -1$ \\ \hline
+18 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = \sqrt{10}$ & $S = \dfrac{1}{e^{10}}$ \\ \hline
+19 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-4n-2}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 10$ & $S = \mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{2\sqrt{2}}{\sqrt{7}}$ & $S = \mathrm{arsh}\left(\frac{7}{8}\right)$ \\ \hline
+20 & $\begin{aligned}\ln(2x^2) - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{4n}}\end{aligned}$ & $x = 10$ & $S = \mathrm{arsh}(100)$ & $x = \dfrac{3}{2\sqrt{2}}$ & $S = \mathrm{arsh}\left(\frac{8}{7}\right)$ \\ \hline
+21 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2(n+1)}}{(2n+1)!}\end{aligned}$ & $x = \dfrac{\pi}{2}$ & $S = \dfrac{\pi}{2}$ & $x = \dfrac{11\pi}{2}$ & $S = -\dfrac{11\pi}{2}$ \\ \hline
+22 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n+1}}{(2n)!}\end{aligned}$ & $x = \pi$ & $S = -\pi$ & $x = 8\pi$ & $S = 8\pi$ \\ \hline
+23 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{n+1}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = 8$ & $S = \dfrac{8}{e^{8}}$ \\ \hline
+24 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-2n}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 100$ & $S = 100\,\mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{10}{9}$ & $S = \frac{10}{9}\,\mathrm{arsh}\left(\frac{9}{10}\right)$ \\ \hline
+25 & $\begin{aligned}x\ln(2x) - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{2n-1}}\end{aligned}$ & $x = 100$ & $S = 100\,\mathrm{arsh}(100)$ & $x = \dfrac{10}{9}$ & $S = \frac{10}{9}\,\mathrm{arsh}\left(\frac{10}{9}\right)$ \\ \hline
+26 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n+3}}{(2n+1)!}\end{aligned}$ & $x = \sqrt{\dfrac{\pi}{2}}$ & $S = 1$ & $x = \sqrt{\dfrac{11\pi}{2}}$ & $S = -\sqrt{\dfrac{11\pi}{2}}$ \\ \hline
+27 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{4n+1}}{(2n)!}\end{aligned}$ & $x = \sqrt{\pi}$ & $S = -\sqrt{\pi}$ & $x = 2\sqrt{2\pi}$ & $S = 2\sqrt{2\pi}$ \\ \hline
+28 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{x^{2n + 1}}{n!}\end{aligned}$ & $x = 1$ & $S = \dfrac{1}{e}$ & $x = 2\sqrt{2}$ & $S = \dfrac{2\sqrt{2}}{e^{8}}$ \\ \hline
+29 & $\begin{aligned}\sum_{n=0}^\infty (-1)^n\cdot\dfrac{(2n)!\,x^{-4n-1}}{4^n\,(2n+1)\,(n!)^2}\end{aligned}$ & $x = 10$ & $S = 10\,\mathrm{arsh}\left(\frac{1}{100}\right)$ & $x = \dfrac{\sqrt{10}}{3}$ & $S = \frac{\sqrt{10}}{3}\,\mathrm{arsh}\left(\frac{9}{10}\right)$ \\ \hline
+30 & $\begin{aligned}x\ln(2x^2) - \sum_{n=1}^\infty \dfrac{(-1)^n\,(2n-1)!!}{2n\,(2n)!!\,x^{4n-1}}\end{aligned}$ & $x = 10$ & $S = 10\,\mathrm{arsh}(100)$ & $x = \dfrac{\sqrt{10}}{3}$ & $S = \frac{\sqrt{10}}{3}\,\mathrm{arsh}\left(\frac{10}{9}\right)$ \\ \hline
+\end{longtable}
+\begin{task}
+\textit{Табуляция специальных функций:} \\
+Цель данной задачи состоит в применении изученных методов к более сложным объектам и кратком знакомстве с многими распространёнными специальными функциями. В каждом варианте требуется реализовать табуляцию заданной специальной функции на равномерной сетке $\omega = \{x=a+j\cdot\Delta,\, j=0,...,100\}$, где шаг разбиения $\Delta = \frac{b-a}{100}$.
+\begin{itemize}
+\item[---] \textbf{Знакочередующиеся ряды:} необходимо использовать принцип Лейбница для определения числа  слагаемых $n$, обеспечивающего ожидаемую точность $\varepsilon=10^{-8}$. Если $n>100$, использовать только первые 100 слагаемых. В каждой точке рассчитать сумму ряда, используя ``наивное'' суммирование (\verb|sum_1|) и предварительную сортировку слагаемых (\verb|sum_2|). Результаты расчётов предоставить в \verb_csv_ файле структуры \verb|"x_i, n, sum_1, sum_2"| с 15 значимыми цифрами;
+\item[---] \textbf{Варианты 3-8, 15-18, 27-30:} На основании первых 100 слагаемых рассчитать сумму ряда, используя ``наивное'' суммирование (\verb|sum_1|) и алгоритм суммирования Кэхена (\verb|sum_2|).  Результаты расчётов предоставить в \verb_csv_ файле структуры \verb|"x_i, sum_1, sum_2"| с 15 значимыми цифрами.
+\end{itemize}
+В отчёте сделать выводы о точности аппроксимаций и возникающих трудностях. Дополнительно предоставить файл с исходным кодом. \textit{Замечание:} Далее $\gamma=0.5772156649...$ есть константа Эйлера-Маскерони.
+\end{task}
+\renewcommand*{\arraystretch}{1.5}
+\begin{longtable}[c]{|c||Sc||c|c|}
+\hline
+\textnumero & Функция & \multicolumn{2}{c|}{Границы отрезка} \\ \hline \endhead
+1 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/Erf.html}{\ExternalLink}\;\erf(x)=\dfrac{2}{\sqrt{\pi}}\sum_{n=0}^\infty \dfrac{(-1)^n\,x^{2n+1}}{n!\, (2n+1)} \end{aligned}$} & $a = 0$ & $b = 10$ \\ \cline{1-1}\cline{3-4}
+2 & & $a = -10$ & $b = 0$ \\ \hline
+3 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/RiemannZetaFunction.html}{\ExternalLink}\;\zeta(x) = \sum_{n=1}^\infty \dfrac{1}{n^x} \end{aligned}$} & $a = 2$ & $b = 4$ \\ \cline{1-1}\cline{3-4}
+4 & & $a = 5$ & $b = 10$ \\ \hline
+5 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/BetaFunction.html}{\ExternalLink}\;\mathrm{B}(x, \pi) = \dfrac{1}{\pi}\sum_{n=0}^\infty \dfrac{(-1)^n}{n!\,(x+n)}\,\prod_{k=0}^n (\pi - k) \end{aligned}$} & $a = 1$ & $b = 2$ \\ \cline{1-1}\cline{3-4}
+6 & & $a = 2$ & $b = 3$ \\ \hline
+7 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/BetaFunction.html}{\ExternalLink}\;\mathrm{B}(x, e) = \dfrac{1}{e}\sum_{n=0}^\infty \dfrac{(-1)^n}{n!\,(x+n)}\,\prod_{k=0}^n (e - k) \end{aligned}$} & $a = 1$ & $b = 2$ \\ \cline{1-1}\cline{3-4}
+8 & & $a = 2$ & $b = 3$ \\ \hline
+9 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/BesselFunctionoftheFirstKind.html}{\ExternalLink}\;J_0(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\,x^{2n}}{(n!)^2\,4^n} \end{aligned}$} & $a = 0$ & $b = 20$ \\ \cline{1-1}\cline{3-4}
+10 & & $a = -20$ & $b = 0$ \\ \hline
+11 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/BesselFunctionoftheFirstKind.html}{\ExternalLink}\;J_1(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\,x^{2n+1}}{n!\,(n+1)!\,2^{2n+1}} \end{aligned}$} & $a = 0$ & $b = 20$ \\ \cline{1-1}\cline{3-4}
+12 & & $a = -20$ & $b = 0$ \\ \hline
+13 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/BesselFunctionoftheFirstKind.html}{\ExternalLink}\;J_2(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\,x^{2(n+1)}}{n!\,(n+2)!\,4^{n+1}} \end{aligned}$} & $a = 0$ & $b = 20$ \\ \cline{1-1}\cline{3-4}
+14 & & $a = -20$ & $b = 0$ \\ \hline
+15 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/LogarithmicIntegral.html}{\ExternalLink}\;\mathrm{li}(x) = \gamma +\ln(\ln x) + \sum_{n=1}^\infty \dfrac{(\ln x)^n}{n\cdot n!} \end{aligned}$} & $a = 10$ & $b = 20$ \\ \cline{1-1}\cline{3-4}
+16 & & $a = 5$ & $b = 10$ \\ \hline \newpage
+17 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/ExponentialIntegral.html}{\ExternalLink}\;\mathrm{Ei}(x) = \gamma +\ln x + \sum_{n=1}^\infty \dfrac{x^n}{n\cdot n!} \end{aligned}$} & $a = 10$ & $b = 20$ \\ \cline{1-1}\cline{3-4}
+18 & & $a = 5$ & $b = 10$ \\ \hline 
+19 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/SineIntegral.html}{\ExternalLink}\;\mathrm{Si}(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\, x^{2n+1}}{(2n+1)\, (2n+1)!} \end{aligned}$} & $a = 0$ & $b = 25$ \\ \cline{1-1}\cline{3-4}
+20 & & $a = -25$ & $b = 0$ \\ \hline
+21 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/CosineIntegral.html}{\ExternalLink}\;\mathrm{Ci}(x) = \gamma + \ln x + \sum_{n=1}^\infty \dfrac{(-1)^n\, x^{2n}}{(2n)\, (2n)!} \end{aligned}$} & $a = 5$ & $b = 10$ \\ \cline{1-1}\cline{3-4}
+22 & & $a = 10$ & $b = 20$ \\ \hline
+23 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/FresnelIntegrals.html}{\ExternalLink}\;S(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\, x^{4n+3}}{(4n+3)\, (2n+1)!} \end{aligned}$} & $a = 0$ & $b = 10$ \\ \cline{1-1}\cline{3-4}
+24 & & $a = -10$ & $b = 0$ \\ \hline
+25 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/FresnelIntegrals.html}{\ExternalLink}\;C(x) = \sum_{n=0}^\infty \dfrac{(-1)^n\, x^{4n+1}}{(4n+1)\, (2n)!} \end{aligned}$} & $a = 0$ & $b = 10$ \\ \cline{1-1}\cline{3-4}
+26 & & $a = -10$ & $b = 0$ \\ \hline
+27 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/Shi.html}{\ExternalLink}\;\mathrm{Shi}(x) = \sum_{n=0}^\infty \dfrac{x^{2n+1}}{(2n+1)\, (2n+1)!} \end{aligned}$} & $a = 0$ & $b = 25$ \\ \cline{1-1}\cline{3-4}
+28 & & $a = -25$ & $b = 0$ \\ \hline
+29 & \multirow{2}{*}{$\begin{aligned} \href{https://mathworld.wolfram.com/Chi.html}{\ExternalLink}\;\mathrm{Chi}(x) = \gamma + \ln x + \sum_{n=1}^\infty \dfrac{x^{2n}}{2n\, (2n)!} \end{aligned}$} & $a = 5$ & $b = 10$ \\ \cline{1-1}\cline{3-4}
+30 & & $a = 10$ & $b = 20$ \\ \hline
+\end{longtable}
+\textbf{Направления для развития.}
+\begin{itemize}
+\item[---] Все специальные функции из второго задания можно рассчитать, используя встроенный функционал некоторых математических программных пакетов. В случае языка \verb_С++_ для этого можно использовать библиотеки \verb_boost_ \href{https://www.boost.org/}{\ExternalLink} и/или \verb_ALGLIB_ \href{https://www.alglib.net/}{\ExternalLink}. Таким образом, факультативным расширением данной практической работы является расчёт значений искомых функций (\verb|f_i|), используя их библиотечные реализации, и оценка отклонений результатов, полученных в задаче 2: \verb/d_1 = f_i - sum_1;/ \verb/d_2 = f_i - sum_2/.
+\item[---] В тех случаях, когда высокая точность играет куда большую роль чем скорость расчётов, с вычислительными погрешностями можно бороться переходя к более ``вместительным'' типам данных. Так, формат \verb_IEEE Quad_ использует 128 битов (из которых 113 есть мантисса) для хранения чисел с плавающей запятой. Программная реализация этого формата для языка \verb_C++_ доступна, например, в библиотеке \verb_boost_ \href{https://www.boost.org/doc/libs/1_80_0/libs/multiprecision/doc/html/boost_multiprecision/tut/floats.html}{\ExternalLink} и достаточно проста в использовании.
+\end{itemize}
+
+\begin{thebibliography}{99}
+\RBibitem{Zorich}
+\by В.А.~Зорич
+\inbook Математический Анализ
+\publ МЦНМО
+\publaddr Москва
+\pages 110--121
+\vol 2
+\year 2002
+
+\Bibitem{Float}
+\by D.~Goldberg
+\paper What every computer scientist should know about floating-point arithmetic
+\vol 23
+\issue 1
+\year 1991
+\jour ACM Computing Surveys
+\pages 5--48
+
+
+\Bibitem{Kahan}
+\by W.~Kahan
+\paper Further remarks on reducing truncation errors
+\vol 8
+\issue 1
+\yr 1965
+\jour Communications of the ACM
+\pages 40
+
+\Bibitem{online}
+\eprint How to avoid the round-off errors in the larger calculations?
+\eprintinfo (version: 2015-12-05)
+\by Computational Science Stack Exchange
+\elink \href{https://scicomp.stackexchange.com/q/21483}{https://scicomp.stackexchange.com/q/21483}
+
+\end{thebibliography}
+\begin{center} \Large
+\LaTeX
+\end{center}
+\end{document}
